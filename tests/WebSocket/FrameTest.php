@@ -51,4 +51,36 @@ final class FrameTest extends TestCase
         $this->assertSame('Hello', $frame->payload);
         $this->assertSame($message, $frame->toBuffer());
     }
+
+    public function test_parse_and_build_single_frame_unmasked_binary_message_256_bytes(): void
+    {
+        $message = hex2bin('827e0100'.str_repeat('6f', 256)) ?: throw new UnexpectedValueException;
+        $frame = Frame::parse($message);
+        $this->assertSame(1, $frame->fin);
+        $this->assertSame(0, $frame->rsv1);
+        $this->assertSame(0, $frame->rsv2);
+        $this->assertSame(0, $frame->rsv3);
+        $this->assertSame(0x02, $frame->opcode);
+        $this->assertTrue($frame->isBinaryFrame());
+        $this->assertFalse($frame->isMasked());
+        $this->assertSame(256, $frame->length);
+        $this->assertSame(str_repeat('o', 256), $frame->payload);
+        $this->assertSame($message, $frame->toBuffer());
+    }
+
+    public function test_parse_and_build_single_frame_unmasked_binary_message_64kb(): void
+    {
+        $message = hex2bin('827f0000000000010000'.str_repeat('6f', 65536)) ?: throw new UnexpectedValueException;
+        $frame = Frame::parse($message);
+        $this->assertSame(1, $frame->fin);
+        $this->assertSame(0, $frame->rsv1);
+        $this->assertSame(0, $frame->rsv2);
+        $this->assertSame(0, $frame->rsv3);
+        $this->assertSame(0x02, $frame->opcode);
+        $this->assertTrue($frame->isBinaryFrame());
+        $this->assertFalse($frame->isMasked());
+        $this->assertSame(65536, $frame->length);
+        $this->assertSame(str_repeat('o', 65536), $frame->payload);
+        $this->assertSame($message, $frame->toBuffer());
+    }
 }

@@ -33,7 +33,7 @@ final readonly class FrameEncoder
         $rsv3 = (int) (bool) $this->frame->rsv1 << 4;
         $opcode = 0b1111 & $this->frame->opcode;
 
-        return $this->pack($fin | $rsv1 | $rsv2 | $rsv3 | $opcode);
+        return $this->char($fin | $rsv1 | $rsv2 | $rsv3 | $opcode);
     }
 
     /**
@@ -42,9 +42,17 @@ final readonly class FrameEncoder
     public function encodeMpl(): string
     {
         $mask = (int) ($this->frame->mask !== null) << 7;
-        $length = 0b0111_1111 & $this->frame->length;
 
-        return $this->pack($mask | $length);
+        switch (true) {
+            case $this->frame->length > 65535:
+                return $this->char($mask | 127)
+                    .$this->unsignedLongLong($this->frame->length);
+            case $this->frame->length > 125:
+                return $this->char($mask | 126)
+                    .$this->unsignedShort($this->frame->length);
+            default:
+                return $this->char($mask | $this->frame->length);
+        }
     }
 
     public function encodeMaskingKey(): string
@@ -74,8 +82,22 @@ final readonly class FrameEncoder
     /**
      * Convert a codepoint to an ASCII character.
      */
-    public function pack(int $codepoint): string
+    public function char(int $codepoint): string
     {
         return pack('C', $codepoint);
+    }
+
+    public function unsignedShort(int $value): string
+    {
+        return $this->char($value >> 8 & 0xff)
+            .$this->char($value & 0xff);
+    }
+
+    public function unsignedLongLong(int $value): string
+    {
+        return $this->unsignedShort($value >> 48 & 0xffff)
+            .$this->unsignedShort($value >> 32 & 0xffff)
+            .$this->unsignedShort($value >> 16 & 0xffff)
+            .$this->unsignedShort($value & 0xffff);
     }
 }

@@ -11,7 +11,7 @@ final class FrameDecoder
         $buffer = new Buffer($message);
 
         [$fin, $rsv1, $rsv2, $rsv3, $opcode] = $this->decodeFro($buffer->char());
-        [$mask, $len] = $this->decodeMpl($buffer->char());
+        [$mask, $len] = $this->decodeMpl($buffer);
         $maskingKey = $mask === 1 ? $this->decodeMaskingKey($buffer) : null;
         $payload = $this->decodePayload($buffer->get($len), $maskingKey);
 
@@ -42,10 +42,18 @@ final class FrameDecoder
      *
      * @return array<int, int>
      */
-    public function decodeMpl(int $byte): array
+    public function decodeMpl(Buffer $buffer): array
     {
+        $byte = $buffer->char();
+
         $mask = ($byte & 0b1000_0000) >> 7;
         $len = $byte & 0b0111_1111;
+
+        $len = match ($len) {
+            126 => (int) hexdec(bin2hex($buffer->get(2))),
+            127 => (int) hexdec(bin2hex($buffer->get(8))),
+            default => $len,
+        };
 
         return [$mask, $len];
     }
