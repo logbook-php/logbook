@@ -38,6 +38,10 @@
     "config": {
         "sort-packages": true
     },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "phpstan analyse"
+    },
     "extra": {
         "laravel": {
             "providers": [

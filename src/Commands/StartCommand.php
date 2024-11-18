@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Logbook\Logbook\Commands;
 
 use Illuminate\Console\Command;
+use Logbook\Logbook\WebSocket\WebSocketServer;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use React\Http\HttpServer;
@@ -21,7 +22,14 @@ final class StartCommand extends Command
     {
         $socket = new SocketServer('127.0.0.1:8345');
 
-        $http = new HttpServer(function (ServerRequestInterface $request): ResponseInterface {
+        $ws = new WebSocketServer();
+
+        $http = new HttpServer(function (ServerRequestInterface $request) use ($ws): ResponseInterface {
+            if ($request->getMethod() === 'GET' &&
+                $request->getUri()->getPath() === '/ws') {
+                return $ws->handle($request);
+            }
+
             return Response::plaintext('The Logbook server is running.');
         });
 
