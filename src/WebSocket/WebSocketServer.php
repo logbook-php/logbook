@@ -4,25 +4,52 @@ declare(strict_types=1);
 
 namespace Logbook\Logbook\WebSocket;
 
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use React\Http\Message\Response;
+use React\Socket\ConnectionInterface;
+use React\Socket\ServerInterface;
+use SplObjectStorage;
 
-final readonly class WebSocketServer
+final class WebSocketServer
 {
-    private HandshakeOpener $handshakeOpener;
+    private readonly HandshakeOpener $handshakeOpener;
+
+    /**
+     * @var \SplObjectStorage<\React\Socket\ConnectionInterface, null>
+     */
+    private readonly SplObjectStorage $pool;
 
     public function __construct()
     {
         $this->handshakeOpener = new HandshakeOpener();
+        $this->pool = new SplObjectStorage();
     }
 
-    public function handle(RequestInterface $request): ResponseInterface
+    public function listen(ServerInterface $server): void
     {
-        if ($this->handshakeOpener->attempt($request)) {
-            return $this->handshakeOpener->respond($request);
+        $server->on('connection', function (ConnectionInterface $connection): void {
+            $connection->on('data', fn (string $data) => $this->handleConnectionMessage($data, $connection));
+            $connection->on('close', fn () => $this->handleConnectionClose($connection));
+        });
+    }
+
+    private function handleConnectionMessage(string $data, ConnectionInterface $connection): void
+    {
+        if ($this->pool->contains($connection)) {
+            return;
         }
 
-        return new Response();
+        if ($this->handshakeOpener->attempt($data)) {
+            if ($this->handshakeOpener->respond($data, $connection)) {
+                $this->pool->attach($connection);
+
+                return;
+            }
+        }
+
+        $connection->close();
+    }
+
+    private function handleConnectionClose(ConnectionInterface $connection): void
+    {
+        $this->pool->detach($connection);
     }
 }

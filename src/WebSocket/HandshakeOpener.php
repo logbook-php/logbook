@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Logbook\Logbook\WebSocket;
 
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use React\Http\Message\Response;
+use GuzzleHttp\Psr7\Message;
+use GuzzleHttp\Psr7\Response;
+use React\Socket\ConnectionInterface;
+use Throwable;
 
 final class HandshakeOpener
 {
@@ -27,9 +28,16 @@ final class HandshakeOpener
     /**
      * Determines if the HTTP request attempts a WebSocket handshake.
      */
-    public function attempt(RequestInterface $request): bool
+    public function attempt(string $message): bool
     {
-        return $request->getHeaderLine('Upgrade') === 'websocket'
+        try {
+            $request = Message::parseRequest($message);
+        } catch (Throwable) {
+            return false;
+        }
+
+        return $request->getMethod() === 'GET'
+            && $request->getHeaderLine('Upgrade') === 'websocket'
             && $request->getHeaderLine('Connection') === 'Upgrade'
             && $request->getHeaderLine('Sec-WebSocket-Key') !== ''
             && $request->getHeaderLine('Sec-WebSocket-Version') !== '';
@@ -38,11 +46,18 @@ final class HandshakeOpener
     /**
      * Send the server's opening handshake.
      */
-    public function respond(RequestInterface $request): ResponseInterface
+    public function respond(string $message, ConnectionInterface $connection): bool
     {
+        $request = Message::parseRequest($message);
+
         if ($request->getHeaderLine('Sec-WebSocket-Version') != self::WEBSOCKET_VERSION) {
-            return (new Response(Response::STATUS_UPGRADE_REQUIRED))
-                ->withHeader('Sec-WebSocket-Version', self::WEBSOCKET_VERSION);
+            $response = new Response(426, [
+                'Sec-WebSocket-Version' => self::WEBSOCKET_VERSION,
+            ]);
+
+            $connection->write(Message::toString($response));
+
+            return false;
         }
 
         $accept = base64_encode(hash('sha1',
@@ -50,9 +65,14 @@ final class HandshakeOpener
             binary: true
         ));
 
-        return (new Response(Response::STATUS_SWITCHING_PROTOCOLS))
-            ->withHeader('Upgrade', 'websocket')
-            ->withHeader('Connection', 'Upgrade')
-            ->withHeader('Sec-WebSocket-Accept', $accept);
+        $response = new Response(101, [
+            'Upgrade' => 'websocket',
+            'Connection' => 'Upgrade',
+            'Sec-WebSocket-Accept' => $accept,
+        ]);
+
+        $connection->write(Message::toString($response));
+
+        return true;
     }
 }
