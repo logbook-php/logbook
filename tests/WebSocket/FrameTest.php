@@ -87,4 +87,52 @@ final class FrameTest extends TestCase
         $this->assertSame(str_repeat('o', 65536), $frame->payload);
         $this->assertSame($message, $frame->toBuffer());
     }
+
+    public function test_parse_and_build_fragmented_unmasked_text_message(): void
+    {
+        // A message contains "Hel"
+        $message1 = hex2bin('010348656c') ?: throw new UnexpectedValueException();
+        // A message contains "lo"
+        $message2 = hex2bin('80026c6f') ?: throw new UnexpectedValueException();
+        $frame1 = Frame::parse($message1);
+        $frame2 = Frame::parse($message2);
+        $this->assertSame(0, $frame1->fin);
+        $this->assertSame(0x1, $frame1->opcode);
+        $this->assertSame(3, $frame1->length);
+        $this->assertSame('Hel', $frame1->payload);
+        $this->assertSame(1, $frame2->fin);
+        $this->assertSame(0x0, $frame2->opcode);
+        $this->assertSame(2, $frame2->length);
+        $this->assertSame('lo', $frame2->payload);
+        $this->assertSame($message1, $frame1->toBuffer());
+        $this->assertSame($message2, $frame2->toBuffer());
+    }
+
+    public function test_parse_and_build_unmasked_ping_request(): void
+    {
+        // A ping request contains a body of "Hello"
+        $message = hex2bin('890548656c6c6f') ?: throw new UnexpectedValueException();
+        $frame = Frame::parse($message);
+        $this->assertSame(1, $frame->fin);
+        $this->assertSame(0x9, $frame->opcode);
+        $this->assertTrue($frame->isPing());
+        $this->assertFalse($frame->isPong());
+        $this->assertSame(5, $frame->length);
+        $this->assertSame('Hello', $frame->payload);
+        $this->assertSame($message, $frame->toBuffer());
+    }
+
+    public function test_parse_and_build_masked_ping_response(): void
+    {
+        // A ping response contains a body of "Hello"
+        $message = hex2bin('8a8537fa213d7f9f4d5158') ?: throw new UnexpectedValueException();
+        $frame = Frame::parse($message);
+        $this->assertSame(1, $frame->fin);
+        $this->assertSame(0x0a, $frame->opcode);
+        $this->assertTrue($frame->isPong());
+        $this->assertFalse($frame->isPing());
+        $this->assertSame(5, $frame->length);
+        $this->assertSame('Hello', $frame->payload);
+        $this->assertSame($message, $frame->toBuffer());
+    }
 }

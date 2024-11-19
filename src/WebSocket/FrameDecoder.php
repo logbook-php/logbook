@@ -32,7 +32,7 @@ final class FrameDecoder
         $rsv1 = ($byte & 0b0100_0000) >> 6;
         $rsv2 = ($byte & 0b0010_0000) >> 5;
         $rsv3 = ($byte & 0b0001_0000) >> 4;
-        $opcode = $byte & 1111;
+        $opcode = $byte & 0b1111;
 
         return [$fin, $rsv1, $rsv2, $rsv3, $opcode];
     }
