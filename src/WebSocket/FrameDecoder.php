@@ -8,7 +8,7 @@ final class FrameDecoder
 {
     public function decode(string $message): Frame
     {
-        $buffer = new Buffer($message);
+        $buffer = new BufferReader($message);
 
         [$fin, $rsv1, $rsv2, $rsv3, $opcode] = $this->decodeFro($buffer->char());
         [$mask, $len] = $this->decodeMpl($buffer);
@@ -42,23 +42,29 @@ final class FrameDecoder
      *
      * @return array<int, int>
      */
-    public function decodeMpl(Buffer $buffer): array
+    public function decodeMpl(BufferReader $buffer): array
     {
         $byte = $buffer->char();
 
         $mask = ($byte & 0b1000_0000) >> 7;
         $len = $byte & 0b0111_1111;
 
+        // A 7-bit field represents the payload length. However, if the length
+        // exceeds the 7-bit boundary, we use a convention to indicate the
+        // actual size. A length value of 126 signifies that the next 2
+        // bytes contain the true payload size. Similarly, a length
+        // value of 127 indicates that the subsequent 8 bytes
+        // represent the payload size.
         $len = match ($len) {
-            126 => (int) hexdec(bin2hex($buffer->get(2))),
-            127 => (int) hexdec(bin2hex($buffer->get(8))),
+            126 => $buffer->unsignedShort(),
+            127 => $buffer->unsignedLongLong(),
             default => $len,
         };
 
         return [$mask, $len];
     }
 
-    public function decodeMaskingKey(Buffer $buffer): string
+    public function decodeMaskingKey(BufferReader $buffer): string
     {
         return $buffer->get(4);
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Logbook\Logbook\Tests\WebSocket;
 
+use Logbook\Logbook\WebSocket\BufferReader;
+use Logbook\Logbook\WebSocket\BufferWriter;
 use Logbook\Logbook\WebSocket\Frame;
 use Logbook\Logbook\WebSocket\FrameDecoder;
 use Logbook\Logbook\WebSocket\FrameEncoder;
@@ -14,6 +16,8 @@ use UnexpectedValueException;
 #[CoversClass(Frame::class)]
 #[CoversClass(FrameEncoder::class)]
 #[CoversClass(FrameDecoder::class)]
+#[CoversClass(BufferWriter::class)]
+#[CoversClass(BufferReader::class)]
 final class FrameTest extends TestCase
 {
     public function test_parse_and_build_single_frame_unmasked_text_message(): void
